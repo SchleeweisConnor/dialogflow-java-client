@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
- 
+
 package ai.api.examples;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 
@@ -30,72 +31,122 @@ import ai.api.model.AIResponse;
  */
 public class TextClientApplication {
 
-  private static final String INPUT_PROMPT = "> ";
-  /**
-   * Default exit code in case of error
-   */
-  private static final int ERROR_EXIT_CODE = 1;
+	private static final String INPUT_PROMPT = "> ";
+	/**
+	 * Default exit code in case of error
+	 */
+	private static final int ERROR_EXIT_CODE = 1;
 
-  /**
-   * @param args List of parameters:<br>
-   *        First parameters should be valid api key<br>
-   *        Second and the following args should be file names containing audio data.
-   */
-  public static void main(String[] args) {
-    if (args.length < 1) {
-      showHelp("Please specify API key", ERROR_EXIT_CODE);
-    }
+	/**
+	 * @param args List of parameters:<br>
+	 *        First parameters should be valid api key<br>
+	 *        Second and the following args should be file names containing audio data.
+	 */
+	public static void main(String[] args) {
+		if (args.length < 1) {
+			showHelp("Please specify API key", ERROR_EXIT_CODE);
+		}
 
-    AIConfiguration configuration = new AIConfiguration(args[0]);
+		AIConfiguration configuration = new AIConfiguration(args[0]);
 
-    AIDataService dataService = new AIDataService(configuration);
+		AIDataService dataService = new AIDataService(configuration);
 
-    String line;
+		String line;
 
-    try (BufferedReader reader = new BufferedReader(new InputStreamReader(System.in))) {
-      System.out.print(INPUT_PROMPT);
-      while (null != (line = reader.readLine())) {
+		try (BufferedReader reader = new BufferedReader(new InputStreamReader(System.in))) {
+			System.out.print(INPUT_PROMPT);
+			while (null != (line = reader.readLine())) {
 
-        try {
-          AIRequest request = new AIRequest(line);
+				try {
+					AIRequest request = new AIRequest(line);
 
-          AIResponse response = dataService.request(request);
+					AIResponse response = dataService.request(request);
+					
+					//remember to test if "score" is above 0.7 from json response
+					if (response.getStatus().getCode() == 200) {
+						System.out.println(response.getResult().getFulfillment().getSpeech());
+					} else {
+						System.err.println(response.getStatus().getErrorDetails());
+					}
+					
+					if (response.getResult().getAction().equalsIgnoreCase("createdirectory")) {
+						String destName = response.getResult().getParameters().get("DestinationDirectory").getAsString();
+						CreateDirectory(destName);
+					} else if (response.getResult().getAction().equalsIgnoreCase("deletedirectory")) {
+						String destName = response.getResult().getParameters().get("DestinationDirectory").getAsString();
+						DeleteDirectory(destName);
+					}
+				} catch (Exception ex) {
+					ex.printStackTrace();
+				}
 
-          if (response.getStatus().getCode() == 200) {
-            System.out.println(response.getResult().getFulfillment().getSpeech());
-          } else {
-            System.err.println(response.getStatus().getErrorDetails());
-          }
-        } catch (Exception ex) {
-          ex.printStackTrace();
-        }
-
-        System.out.print(INPUT_PROMPT);
-      }
-    } catch (IOException ex) {
-      ex.printStackTrace();
-    }
-    System.out.println("See ya!");
-  }
+				System.out.print(INPUT_PROMPT);
+			}
+		} catch (IOException ex) {
+			ex.printStackTrace();
+		}
+		System.out.println("See ya!");
+	}
 
 
-  /**
-   * Output application usage information to stdout and exit. No return from function.
-   * 
-   * @param errorMessage Extra error message. Would be printed to stderr if not null and not empty.
-   * 
-   */
-  private static void showHelp(String errorMessage, int exitCode) {
-    if (errorMessage != null && errorMessage.length() > 0) {
-      System.err.println(errorMessage);
-      System.err.println();
-    }
+	/**
+	 * Output application usage information to stdout and exit. No return from function.
+	 * 
+	 * @param errorMessage Extra error message. Would be printed to stderr if not null and not empty.
+	 * 
+	 */
+	private static void showHelp(String errorMessage, int exitCode) {
+		if (errorMessage != null && errorMessage.length() > 0) {
+			System.err.println(errorMessage);
+			System.err.println();
+		}
 
-    System.out.println("Usage: APIKEY");
-    System.out.println();
-    System.out.println("APIKEY  Your unique application key");
-    System.out.println("        See https://docs.api.ai/docs/key-concepts for details");
-    System.out.println();
-    System.exit(exitCode);
-  }
+		System.out.println("Usage: APIKEY");
+		System.out.println();
+		System.out.println("APIKEY  Your unique application key");
+		System.out.println("        See https://docs.api.ai/docs/key-concepts for details");
+		System.out.println();
+		System.exit(exitCode);
+	}
+
+	private static boolean CreateDirectory(String name) {
+		File theDir = new File(name);
+
+		// if the directory does not exist, create it
+		boolean result = false;
+		if (!theDir.exists()) {
+			System.out.println("Creating directory: " + theDir.getName());
+
+			try {
+				theDir.mkdir();
+				result = true;
+			} catch(SecurityException se) {
+				//handle it
+			}        
+			
+			if (result)
+				System.out.println("DIR created");
+		}
+		return result;
+	}
+	
+	private static boolean DeleteDirectory(String name) {
+		File theDir = new File(name);
+		
+		boolean result = false;
+		if (theDir.exists()) {
+			System.out.println("Removing directory: " + theDir.getName());
+			
+			try {
+				theDir.delete();
+				result = true;
+			} catch(SecurityException se) {
+				System.out.println(se);
+			}
+			
+			if (result)
+				System.out.println("DIR deleted");
+		}
+		return result;
+	}
 }
